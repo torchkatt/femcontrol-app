@@ -19,5 +19,5 @@ RUN npm run build
 # Cloud Run usa el puerto 8080 por defecto
 EXPOSE 8080
 
-# Iniciar servidor
-CMD ["node", "dist/server.js"]
+# Iniciar servidor asegurando que la base de datos esté migrada
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
