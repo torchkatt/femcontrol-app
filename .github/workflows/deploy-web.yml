@@ -1,0 +1,41 @@
+name: Deploy FemControl PWA to Firebase
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Permite trigger manual desde GitHub UI
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        working-directory: mobile
+        run: flutter pub get
+
+      - name: Build web PWA
+        working-directory: mobile
+        run: |
+          flutter build web \
+            --pwa-strategy=offline-first \
+            --release \
+            --base-href="/"
+
+      - name: Deploy to Firebase Hosting
+        working-directory: mobile
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          npm install -g firebase-tools
+          firebase deploy --only hosting --token "$FIREBASE_TOKEN" --non-interactive

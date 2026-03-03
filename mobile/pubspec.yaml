@@ -1,0 +1,44 @@
+name: femcontrol
+description: Aplicación de seguimiento del ciclo menstrual - Local First, orientada a la privacidad.
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Navigation
+  go_router: ^14.0.0
+  # State Management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+  # HTTP
+  dio: ^5.4.0
+  # Secure Storage
+  flutter_secure_storage: ^9.0.0
+  # Local Storage
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  # Shared Preferences
+  shared_preferences: ^2.2.0
+  # Date utilities
+  intl: ^0.19.0
+  # Google Sign-In
+  google_sign_in: ^6.2.1
+  google_sign_in_web: ^0.12.3
+  # UI
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  build_runner: ^2.4.8
+  riverpod_generator: ^2.4.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/

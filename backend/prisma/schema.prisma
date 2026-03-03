@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  name          String
+  passwordHash  String?  // null for OAuth users
+  googleId      String?  @unique
+  role          Role       @default(PRIMARY)
+  pairingCode   String     @unique @default(cuid())
+  partnerId     String?    @unique
+  partner       User?      @relation("CoupleLink", fields: [partnerId], references: [id])
+  linkedPartner User?      @relation("CoupleLink")
+  cycles        Cycle[]
+  dailyLogs     DailyLog[]
+  createdAt     DateTime   @default(now())
+}
+
+model Cycle {
+  id             String     @id @default(uuid())
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startDate      DateTime
+  endDate        DateTime?
+  expectedLength Int        @default(28)
+  createdAt      DateTime   @default(now())
+}
+
+model DailyLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  logDate     DateTime
+  flowLevel   Int?     // 1-4: Ligero → Abundante
+  painLevel   Int?     // 1-4: Leve → Intenso
+  mood        String?  // JSON array ["feliz","ansiosa"...]
+  symptoms    String?  // JSON array ["calambres","hinchazón"...]
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, logDate])
+}
+
+enum Role {
+  PRIMARY
+  PARTNER
+}

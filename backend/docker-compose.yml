@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: femcontrol
+      POSTGRES_PASSWORD: supersecretpassword
+      POSTGRES_DB: femcontrol
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  backend:
+    build: .
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://femcontrol:supersecretpassword@db:5432/femcontrol?schema=public
+      - PORT=443
+    ports:
+      - "443:443"
+    depends_on:
+      - db
+
+volumes:
+  db_data:
