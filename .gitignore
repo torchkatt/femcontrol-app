@@ -88,3 +88,4 @@ android/key.properties
 *.swp
 *.swo
 *~
+.claude/

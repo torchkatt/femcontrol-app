@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/local_db_service.dart';
+import '../../home/providers/home_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import 'package:intl/intl.dart';
@@ -23,9 +24,37 @@ class _DailyLogScreenState extends ConsumerState<DailyLogScreen> {
   bool _hasPeriod = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Pre-rellena con el registro del día si ya existe
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadExistingLog());
+  }
+
+  @override
   void dispose() {
     _notesCtrl.dispose();
     super.dispose();
+  }
+
+  /// Carga el registro del día actual y pre-rellena el formulario.
+  Future<void> _loadExistingLog() async {
+    final db = ref.read(localDbServiceProvider);
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final log = await db.getLogForDate(today);
+    if (log == null || !mounted) return;
+    setState(() {
+      final flow = log['flowLevel'] as int?;
+      if (flow != null && flow > 0) {
+        _hasPeriod = true;
+        _flow = flow.toDouble();
+      }
+      final pain = log['painLevel'] as int?;
+      if (pain != null && pain > 0) _pain = pain.toDouble();
+      _moods.addAll(List<String>.from(log['mood'] ?? []));
+      _symptoms.addAll(List<String>.from(log['symptoms'] ?? []));
+      final notes = log['notes'] as String?;
+      if (notes != null && notes.isNotEmpty) _notesCtrl.text = notes;
+    });
   }
 
   Future<void> _save() async {
@@ -35,12 +64,15 @@ class _DailyLogScreenState extends ConsumerState<DailyLogScreen> {
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
       await db.upsertLog(
         logDate: today,
-        flowLevel: _hasPeriod ? _flow.round() : null,
-        painLevel: _pain > 0 ? _pain.round() : null,
+        flowLevel: _hasPeriod ? _flow.round() : 0,
+        painLevel: _pain.round(),
         mood: _moods.toList(),
         symptoms: _symptoms.toList(),
-        notes: _notesCtrl.text.isNotEmpty ? _notesCtrl.text : null,
+        notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
       );
+      // Forzar refresco en Home → la UI se actualiza de inmediato
+      ref.invalidate(todayLogProvider);
+      ref.invalidate(cycleProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -145,6 +177,7 @@ class _DailyLogScreenState extends ConsumerState<DailyLogScreen> {
               children: AppConstants.moods.map((m) {
                 final sel = _moods.contains(m);
                 return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () => setState(() => sel ? _moods.remove(m) : _moods.add(m)),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
@@ -169,6 +202,7 @@ class _DailyLogScreenState extends ConsumerState<DailyLogScreen> {
               children: AppConstants.symptoms.map((s) {
                 final sel = _symptoms.contains(s);
                 return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () => setState(() => sel ? _symptoms.remove(s) : _symptoms.add(s)),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),

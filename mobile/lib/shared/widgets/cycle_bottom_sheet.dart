@@ -55,7 +55,7 @@ class CycleBottomSheet extends StatelessWidget {
               height: 4,
               margin: const EdgeInsets.only(bottom: 24),
               decoration: BoxDecoration(
-                color: AppColors.sage.withValues(alpha: 0.5),
+                color: AppColors.sage.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),

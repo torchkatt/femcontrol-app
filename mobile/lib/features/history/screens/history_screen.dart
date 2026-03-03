@@ -46,20 +46,21 @@ class HistoryScreen extends ConsumerWidget {
             logMap[dateStr] = log as Map<String, dynamic>;
           }
 
-          return Column(
-            children: [
-              _CalendarLegend(),
-              Expanded(
-                child: _MonthCalendar(year: now.year, month: now.month, logMap: logMap),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                _CalendarLegend(),
+                _MonthCalendar(year: now.year, month: now.month, logMap: logMap),
+                const SizedBox(height: 8),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
                   itemCount: logs.length,
                   itemBuilder: (_, i) => _LogTile(log: logs[i] as Map<String, dynamic>),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
@@ -138,7 +139,8 @@ class _MonthCalendar extends StatelessWidget {
               final day = i - startWeekday + 1;
               final dateStr = '$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
               final log = logMap[dateStr];
-              final isToday = DateTime.now().day == day;
+              final now2 = DateTime.now();
+              final isToday = now2.year == year && now2.month == month && now2.day == day;
 
               Color dotColor = AppColors.divider;
               if (log != null) {

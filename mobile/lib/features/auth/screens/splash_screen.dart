@@ -44,14 +44,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     await Future.delayed(const Duration(milliseconds: 2200));
     if (!mounted) return;
 
-    final authState = ref.read(authProvider);
-
-    // Esperar a que termine la inicialización
-    if (authState.isInitializing) {
-      await Future.delayed(const Duration(milliseconds: 500));
+    // Esperar a que la inicialización termine (polling cada 100ms, máx 5s)
+    for (int i = 0; i < 50; i++) {
+      if (!ref.read(authProvider).isInitializing) break;
+      await Future.delayed(const Duration(milliseconds: 100));
       if (!mounted) return;
     }
 
+    if (!mounted) return;
     final freshState = ref.read(authProvider);
 
     // Si ya puede usar la app → ir a home

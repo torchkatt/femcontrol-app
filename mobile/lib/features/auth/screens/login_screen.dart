@@ -26,7 +26,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    final ok = await ref.read(authProvider.notifier).login(_email.text.trim(), _password.text);
+    final email = _email.text.trim();
+    final password = _password.text.trim();
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor completa todos los campos')),
+      );
+      return;
+    }
+    final ok = await ref.read(authProvider.notifier).login(email, password);
     if (ok && mounted) context.go('/home');
   }
 

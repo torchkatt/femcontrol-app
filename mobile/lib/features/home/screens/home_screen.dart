@@ -131,7 +131,7 @@ class HomeScreen extends ConsumerWidget {
       isScrollControlled: true,
       backgroundColor: AppColors.bgCard,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => _StartCycleSheet(onStarted: () => ref.refresh(cycleProvider)),
+      builder: (_) => _StartCycleSheet(onStarted: () => ref.invalidate(cycleProvider)),
     );
   }
 }
@@ -251,6 +251,7 @@ class _NoCycleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onStart,
       child: Container(
         padding: const EdgeInsets.all(24),
@@ -285,6 +286,7 @@ class _QuickActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
@@ -312,6 +314,7 @@ class _EmptyLogCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(20),
@@ -399,6 +402,7 @@ class _SyncBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -438,6 +442,7 @@ class _ProfileButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () {
         showModalBottomSheet(
           context: context,

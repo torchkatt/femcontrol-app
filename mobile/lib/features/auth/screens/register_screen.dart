@@ -33,14 +33,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _submit() async {
-    if (_password.text.length < 6) {
+    final name = _name.text.trim();
+    final email = _email.text.trim();
+    final password = _password.text.trim();
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor completa todos los campos')),
+      );
+      return;
+    }
+    if (password.length < 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('La contraseña debe tener al menos 6 caracteres')),
       );
       return;
     }
-    final ok = await ref.read(authProvider.notifier).register(
-        _email.text.trim(), _password.text, _name.text.trim());
+    final ok = await ref.read(authProvider.notifier).register(email, password, name);
     if (ok && mounted) context.go('/home');
   }
 
