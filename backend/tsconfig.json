@@ -38,5 +38,8 @@
   },
   "exclude": [
     "prisma.config.ts"
+  ],
+  "include": [
+    "src/**/*"
   ]
 }
