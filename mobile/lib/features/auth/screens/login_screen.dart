@@ -87,6 +87,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: Text(state.error!, style: const TextStyle(color: AppColors.terracottaDark, fontSize: 14)),
                 ),
 
+              // ── Info nube ─────────────────────────────────────
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.sage.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.sage.withOpacity(0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 16, color: AppColors.sageDark),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'La cuenta en la nube requiere el servidor backend. Puedes usar la app completa sin cuenta.',
+                        style: TextStyle(fontSize: 12, color: AppColors.sageDark, height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
               // ── Google Button ──────────────────────────────────
               GoogleSignInButton(onTap: _googleSignIn, isLoading: state.isLoading),
               const SizedBox(height: 20),

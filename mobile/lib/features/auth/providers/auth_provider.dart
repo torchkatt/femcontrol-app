@@ -235,13 +235,28 @@ class AuthNotifier extends StateNotifier<AuthState> {
   // ── Utilidades ────────────────────────────────────────────────────
 
   String _parseError(dynamic e) {
-    if (e.toString().contains('DioException')) {
+    final str = e.toString();
+    // Errores de red / servidor no disponible
+    if (str.contains('SocketException') ||
+        str.contains('Connection refused') ||
+        str.contains('failed host lookup') ||
+        str.contains('Network is unreachable') ||
+        str.contains('errno = 111')) {
+      return 'Servidor no disponible. La sincronización en la nube no está activa.';
+    }
+    if (str.contains('DioException')) {
+      // Conexión rechazada o sin respuesta
+      if (str.contains('connection') || str.contains('refused') ||
+          str.contains('timed out') || str.contains('No route to host')) {
+        return 'Servidor no disponible. La sincronización en la nube no está activa.';
+      }
       try {
         final data = (e as dynamic).response?.data;
-        return data?['message'] ?? 'Error de conexión';
+        return data?['message'] ?? 'Error de conexión con el servidor';
       } catch (_) {}
+      return 'Error de conexión con el servidor';
     }
-    return e.toString().replaceAll('Exception: ', '');
+    return str.replaceAll('Exception: ', '');
   }
 }
 

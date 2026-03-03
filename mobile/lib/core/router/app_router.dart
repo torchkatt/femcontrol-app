@@ -34,8 +34,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Sin acceso en página protegida → login
       if (!canAccess && !onPublicPage) return '/login';
 
-      // Ya puede acceder en página pública (no splash) → home
-      if (canAccess && onPublicPage && loc != '/splash') return '/home';
+      // Solo usuarios completamente autenticados se redirigen desde auth pages → home
+      // Invitados pueden navegar a /login o /register para crear cuenta
+      if (authState.isAuthenticated && onPublicPage && loc != '/splash') return '/home';
 
       return null;
     },

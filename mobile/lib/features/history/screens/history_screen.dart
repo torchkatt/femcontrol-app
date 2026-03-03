@@ -5,9 +5,9 @@ import '../../../shared/services/local_db_service.dart';
 import '../../../core/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 
-final _historyProvider = StreamProvider.autoDispose<List>((ref) {
+final _historyProvider = FutureProvider.autoDispose<List>((ref) async {
   final db = ref.read(localDbServiceProvider);
-  return db.watchAllLogs();
+  return db.getAllLogs();
 });
 
 class HistoryScreen extends ConsumerWidget {
