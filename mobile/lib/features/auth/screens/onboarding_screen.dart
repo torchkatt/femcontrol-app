@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../shared/widgets/name_input_sheet.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -51,8 +52,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _continueAsGuest() async {
+    // Mostrar BottomSheet para solicitar nombre antes de continuar
+    final name = await showNameInputSheet(context);
+    if (!mounted) return;
     await _markOnboarded();
-    await ref.read(authProvider.notifier).continueAsGuest();
+    await ref.read(authProvider.notifier).continueAsGuest(name: name);
     if (mounted) context.go('/home');
   }
 
@@ -220,3 +224,4 @@ class _SlideWidget extends StatelessWidget {
     );
   }
 }
+

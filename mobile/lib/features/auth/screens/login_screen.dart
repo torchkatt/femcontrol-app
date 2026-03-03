@@ -5,6 +5,7 @@ import '../providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/primary_button.dart';
 import '../../../shared/widgets/google_sign_in_button.dart';
+import '../../../shared/widgets/name_input_sheet.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -161,7 +162,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 width: double.infinity,
                 child: TextButton.icon(
                   onPressed: () async {
-                    await ref.read(authProvider.notifier).continueAsGuest();
+                    final name = await showNameInputSheet(context);
+                    if (!context.mounted) return;
+                    await ref.read(authProvider.notifier).continueAsGuest(name: name);
                     if (context.mounted) context.go('/home');
                   },
                   icon: const Icon(Icons.phone_android_rounded, size: 16, color: AppColors.textSecondary),

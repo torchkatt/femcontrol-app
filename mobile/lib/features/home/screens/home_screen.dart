@@ -16,7 +16,7 @@ class HomeScreen extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final cycleAsync = ref.watch(cycleProvider);
     final todayLogAsync = ref.watch(todayLogProvider);
-    final userName = authState.user?['name']?.split(' ').first ?? 'Hola';
+    final userName = authState.user?['name']?.split(' ').first;
 
     return Scaffold(
       backgroundColor: AppColors.bgCream,
@@ -30,7 +30,8 @@ class HomeScreen extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Hola, $userName 👋',
+                      Text(
+                          userName != null ? 'Hola, $userName 👋' : '¡Bienvenida! 👋',
                           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.5)),
                       const Text('¿Cómo te sientes hoy?',
                           style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),

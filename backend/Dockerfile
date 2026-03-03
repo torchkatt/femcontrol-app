@@ -16,8 +16,8 @@ RUN npx prisma generate
 
 RUN npm run build
 
-# Exponer estrictamente el puerto 443
-EXPOSE 443
+# Cloud Run usa el puerto 8080 por defecto
+EXPOSE 8080
 
-# Comando para iniciar la aplicación (asegúrate de que tu server escuche en el 443)
+# Iniciar servidor
 CMD ["node", "dist/server.js"]

@@ -9,7 +9,22 @@ import coupleRoutes from './routes/couple.routes';
 const app = express();
 const port = process.env.PORT || 4000;
 
-app.use(cors());
+const allowedOrigins = [
+    'https://femcontrol-app.web.app',
+    'https://femcontrol-app.firebaseapp.com',
+];
+
+app.use(cors({
+    origin: (origin, callback) => {
+        // Permitir requests sin origin (mobile, Postman, etc.) y dominios aprobados
+        if (!origin || allowedOrigins.includes(origin) || /^http:\/\/localhost/.test(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+}));
 app.use(express.json());
 
 // Routes
