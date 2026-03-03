@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/local_db_service.dart';
-import '../../home/providers/home_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import 'package:intl/intl.dart';
@@ -70,9 +69,6 @@ class _DailyLogScreenState extends ConsumerState<DailyLogScreen> {
         symptoms: _symptoms.toList(),
         notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
       );
-      // Forzar refresco en Home → la UI se actualiza de inmediato
-      ref.invalidate(todayLogProvider);
-      ref.invalidate(cycleProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

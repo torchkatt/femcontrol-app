@@ -180,6 +180,40 @@ class LocalDbService {
   }
 
   // ══════════════════════════════════════════════════════════════════
+  // STREAMS REACTIVOS (actualizaciones en tiempo real via Hive.watch)
+  // ══════════════════════════════════════════════════════════════════
+
+  /// Stream del estado del ciclo: emite inmediatamente y cada vez que
+  /// cambia la caja de ciclos.
+  Stream<Map<String, dynamic>?> watchCurrentCycleStatus() async* {
+    yield await getCurrentCycleStatus();
+    await for (final _ in _cycles.watch()) {
+      yield await getCurrentCycleStatus();
+    }
+  }
+
+  /// Stream del registro de una fecha: emite inmediatamente y cada vez
+  /// que cambia esa clave en la caja de logs.
+  Stream<Map<String, dynamic>?> watchLogForDate(String date) async* {
+    yield await getLogForDate(date);
+    await for (final event in _logs.watch(key: date)) {
+      final raw = event.value as String?;
+      yield raw == null
+          ? null
+          : Map<String, dynamic>.from(jsonDecode(raw) as Map);
+    }
+  }
+
+  /// Stream de todos los registros: emite inmediatamente y cada vez que
+  /// cambia cualquier clave en la caja de logs.
+  Stream<List<Map<String, dynamic>>> watchAllLogs({int limit = 90}) async* {
+    yield await getAllLogs(limit: limit);
+    await for (final _ in _logs.watch()) {
+      yield await getAllLogs(limit: limit);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
   // CONFIGURACIÓN / USUARIO LOCAL
   // ══════════════════════════════════════════════════════════════════
 
