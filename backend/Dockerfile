@@ -1,5 +1,5 @@
 # Dockerfile para el Backend Node.js
-FROM node:18-alpine
+FROM node:22-alpine
 
 # Install openssl and libc6-compat for Prisma
 RUN apk add --no-cache openssl openssl-dev libc6-compat
