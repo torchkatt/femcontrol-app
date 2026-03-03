@@ -1,6 +1,6 @@
 class AppConstants {
   static const String appName = 'FemControl';
-  static const String baseUrl = 'http://localhost:4000/api';
+  static const String baseUrl = 'https://femcontrol-app.onrender.com/api';
   static const String tunnelUrl = 'http://localhost:8081';
 
   // Moods
