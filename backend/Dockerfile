@@ -20,4 +20,4 @@ RUN npm run build
 EXPOSE 8080
 
 # Iniciar servidor asegurando que la base de datos esté migrada
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/server.js"]
+CMD ["sh", "-c", "npx prisma db push --accept-data-loss && node dist/server.js"]
