@@ -145,6 +145,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: res['data']['user'],
         isLoading: false,
       );
+      unawaited(_syncLocalToCloud()); // Migra datos locales al backend
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _parseError(e));
     }
@@ -201,6 +202,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: res['data']['user'],
         isLoading: false,
       );
+      unawaited(_syncLocalToCloud()); // Migra datos locales al backend
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _parseError(e));
@@ -220,6 +222,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         user: res['data']['user'],
         isLoading: false,
       );
+      unawaited(_syncLocalToCloud()); // Migra datos locales al backend
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _parseError(e));
@@ -247,13 +250,69 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   // ── Refrescar perfil desde el servidor ────────────────────────────
   /// Llama a /auth/profile y actualiza el state con los datos frescos del rol.
-  /// Úsalo después de operaciones que cambian el rol (pair/unlink).
   Future<void> refreshProfile() async {
     try {
       final profile = await _api.getProfile();
       state = state.copyWith(user: profile['data']);
-    } catch (_) {
-      // Si falla el refresco, no es crítico — la UI actualiza al próximo login
+    } catch (_) {}
+  }
+
+  // ── Sincronizar datos locales con el backend ───────────────────────
+  /// Sube silenciosamente los ciclos y logs de Hive al backend
+  /// justo después del login/register. No bloquea la UI.
+  Future<void> _syncLocalToCloud() async {
+    try {
+      // 1. Ciclos: solo el activo más reciente (sin fecha de fin)
+      final cycles = await _db.getCycleHistory();
+      // Subir ciclos en orden cronológico (más antiguo primero)
+      final toSync = cycles.reversed.toList();
+      String? lastSyncedDate;
+      for (final cycle in toSync) {
+        try {
+          await _api.startCycle(
+            cycle['startDate'] as String,
+            expectedLength: (cycle['expectedLength'] as int?) ?? 28,
+          );
+          lastSyncedDate = cycle['startDate'] as String?;
+        } catch (_) {
+          // Si el ciclo ya existe en el backend, continuamos
+        }
+      }
+      if (kDebugMode && lastSyncedDate != null) {
+        debugPrint('[Sync] Ciclos subidos hasta: $lastSyncedDate');
+      }
+
+      // 2. Registros diarios: últimos 90 días
+      final logs = await _db.getAllLogs(limit: 90);
+      for (final log in logs) {
+        try {
+          final logDate = log['logDate'] as String?;
+          if (logDate == null) continue;
+          final flow = log['flowLevel'] as int?;
+          final pain = log['painLevel'] as int?;
+          final mood = log['mood'] != null
+              ? List<String>.from(log['mood'] as List)
+              : null;
+          final symptoms = log['symptoms'] != null
+              ? List<String>.from(log['symptoms'] as List)
+              : null;
+          final notes = log['notes'] as String?;
+          await _api.upsertLog(
+            logDate: logDate,
+            flowLevel: flow,
+            painLevel: pain,
+            mood: mood,
+            symptoms: symptoms,
+            notes: notes,
+          );
+        } catch (_) {
+          // Continuar con otros logs si uno falla
+        }
+      }
+      if (kDebugMode) debugPrint('[Sync] ${logs.length} logs sincronizados al backend');
+    } catch (e) {
+      // Sync falla silenciosamente — no es bloqueante
+      if (kDebugMode) debugPrint('[Sync] Error en sincronización: $e');
     }
   }
 

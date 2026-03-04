@@ -753,17 +753,26 @@ class _StartCycleSheetState extends ConsumerState<_StartCycleSheet> {
   Future<void> _save() async {
     setState(() => _loading = true);
     try {
-      final db = ref.read(localDbServiceProvider);
-      // Normalizar fecha sin hora para evitar problemas de zona horaria
       final dateStr =
           '${_selected.year}-${_selected.month.toString().padLeft(2, '0')}-${_selected.day.toString().padLeft(2, '0')}';
-      await db.startCycle(dateStr, expectedLength: _length);
+
+      final authState = ref.read(authProvider);
+      if (authState.isAuthenticated) {
+        // Usuario autenticado → guardar en el backend para que la pareja lo vea
+        final api = ref.read(apiServiceProvider);
+        await api.startCycle(dateStr, expectedLength: _length);
+      } else {
+        // Modo invitado → solo local
+        final db = ref.read(localDbServiceProvider);
+        await db.startCycle(dateStr, expectedLength: _length);
+      }
+
       widget.onStarted();
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('Error al guardar: $e')),
         );
       }
     } finally {

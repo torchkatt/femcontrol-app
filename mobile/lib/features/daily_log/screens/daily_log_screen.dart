@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/services/local_db_service.dart';
+import '../../../shared/services/api_service.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 import 'package:intl/intl.dart';
@@ -37,12 +39,23 @@ class _DailyLogScreenState extends ConsumerState<DailyLogScreen> {
 
   /// Carga el registro del día actual y pre-rellena el formulario.
   Future<void> _loadExistingLog() async {
-    final db = ref.read(localDbServiceProvider);
     final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final log = await db.getLogForDate(today);
+    final authState = ref.read(authProvider);
+    Map<String, dynamic>? log;
+
+    if (authState.isAuthenticated) {
+      try {
+        log = await ref.read(apiServiceProvider).getLogForDate(today);
+      } catch (_) {
+        log = await ref.read(localDbServiceProvider).getLogForDate(today);
+      }
+    } else {
+      log = await ref.read(localDbServiceProvider).getLogForDate(today);
+    }
+
     if (log == null || !mounted) return;
     setState(() {
-      final flow = log['flowLevel'] as int?;
+      final flow = log!['flowLevel'] as int?;
       if (flow != null && flow > 0) {
         _hasPeriod = true;
         _flow = flow.toDouble();
@@ -59,16 +72,36 @@ class _DailyLogScreenState extends ConsumerState<DailyLogScreen> {
   Future<void> _save() async {
     setState(() => _loading = true);
     try {
-      final db = ref.read(localDbServiceProvider);
       final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      await db.upsertLog(
-        logDate: today,
-        flowLevel: _hasPeriod ? _flow.round() : 0,
-        painLevel: _pain.round(),
-        mood: _moods.toList(),
-        symptoms: _symptoms.toList(),
-        notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
-      );
+      final flowLevel = _hasPeriod ? _flow.round() : 0;
+      final painLevel = _pain.round();
+      final moods = _moods.toList();
+      final symptoms = _symptoms.toList();
+      final notes = _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null;
+
+      final authState = ref.read(authProvider);
+      if (authState.isAuthenticated) {
+        // Guardar en el backend (visible para la pareja)
+        await ref.read(apiServiceProvider).upsertLog(
+          logDate: today,
+          flowLevel: flowLevel,
+          painLevel: painLevel,
+          mood: moods,
+          symptoms: symptoms,
+          notes: notes,
+        );
+      } else {
+        // Modo invitado → solo local
+        await ref.read(localDbServiceProvider).upsertLog(
+          logDate: today,
+          flowLevel: flowLevel,
+          painLevel: painLevel,
+          mood: moods,
+          symptoms: symptoms,
+          notes: notes,
+        );
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
