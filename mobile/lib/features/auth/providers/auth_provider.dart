@@ -245,7 +245,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     );
   }
 
-  // ── Utilidades ────────────────────────────────────────────────────
+  // ── Refrescar perfil desde el servidor ────────────────────────────
+  /// Llama a /auth/profile y actualiza el state con los datos frescos del rol.
+  /// Úsalo después de operaciones que cambian el rol (pair/unlink).
+  Future<void> refreshProfile() async {
+    try {
+      final profile = await _api.getProfile();
+      state = state.copyWith(user: profile['data']);
+    } catch (_) {
+      // Si falla el refresco, no es crítico — la UI actualiza al próximo login
+    }
+  }
+
 
   String _parseError(dynamic e) {
     final str = e.toString();

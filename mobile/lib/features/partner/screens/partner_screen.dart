@@ -103,6 +103,8 @@ class _PartnerScreenState extends ConsumerState<PartnerScreen> {
       await api.pairPartner(code);
       ref.invalidate(partnerInfoProvider);
       ref.invalidate(partnerCycleStatusProvider);
+      // Refrescar perfil para actualizar el campo `role` en el estado
+      await ref.read(authProvider.notifier).refreshProfile();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -145,6 +147,8 @@ class _PartnerScreenState extends ConsumerState<PartnerScreen> {
         ref.invalidate(partnerInfoProvider);
         ref.invalidate(partnerCycleStatusProvider);
         ref.invalidate(sharingSettingsProvider);
+        // Refrescar perfil para restaurar el rol a PRIMARY
+        await ref.read(authProvider.notifier).refreshProfile();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Desvinculado exitosamente')),
