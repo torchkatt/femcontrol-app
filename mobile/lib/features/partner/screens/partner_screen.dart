@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -265,15 +266,37 @@ class _AuthenticatedPartnerViewState
                     fontSize: 13,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  myCode,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        myCode,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 20),
+                      tooltip: 'Copiar código',
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: myCode)).then((_) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('¡Código copiado al portapapeles! 📋'),
+                                duration: Duration(seconds: 2),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                        });
+                      },
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Text(
