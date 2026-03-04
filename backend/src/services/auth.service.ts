@@ -40,10 +40,11 @@ export class AuthService {
 
     static async login(email: string, password: string) {
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user || !user.passwordHash) throw new Error('Credenciales incorrectas');
+        if (!user) throw new Error('No existe una cuenta con ese correo. ¿Quieres registrarte?');
+        if (!user.passwordHash) throw new Error('Esta cuenta fue creada con Google. Usa el botón de Google para iniciar sesión.');
 
         const isValid = await bcrypt.compare(password, user.passwordHash);
-        if (!isValid) throw new Error('Credenciales incorrectas');
+        if (!isValid) throw new Error('Contraseña incorrecta.');
 
         const { passwordHash: _, ...safeUser } = user;
         const token = signToken({ userId: user.id, email: user.email, role: user.role });
