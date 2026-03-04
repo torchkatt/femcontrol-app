@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { pairPartner, getPartnerInfo, unlinkPartner, getPartnerCycleStatus, createLogForPartner } from '../controllers/couple.controller';
+import { pairPartner, getPartnerInfo, unlinkPartner, getPartnerCycleStatus, createLogForPartner, getSharingSettings, updateSharingSettings } from '../controllers/couple.controller';
 import { authenticate } from '../middleware/auth.middleware';
 
 const router = Router();
@@ -9,5 +9,7 @@ router.get('/partner', authenticate, getPartnerInfo);
 router.get('/partner/cycle', authenticate, getPartnerCycleStatus);
 router.post('/partner/log', authenticate, createLogForPartner);
 router.delete('/unlink', authenticate, unlinkPartner);
+router.get('/sharing', authenticate, getSharingSettings);
+router.put('/sharing', authenticate, updateSharingSettings);
 
 export default router;

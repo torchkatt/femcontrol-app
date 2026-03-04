@@ -7,9 +7,27 @@ function calculatePhase(day: number): string {
     return 'lutea';
 }
 
+interface SharingSettings {
+    fertileWindow: boolean;
+    symptoms: boolean;
+}
+
+const DEFAULT_SHARING: SharingSettings = { fertileWindow: true, symptoms: false };
+
+function parseSharingSettings(json: string | null): SharingSettings {
+    if (!json) return DEFAULT_SHARING;
+    try {
+        return { ...DEFAULT_SHARING, ...JSON.parse(json) };
+    } catch {
+        return DEFAULT_SHARING;
+    }
+}
+
 export class CoupleService {
+
+    // ── Vinculación ───────────────────────────────────────────────────
+
     static async pairPartner(userId: string, pairingCode: string) {
-        // Find partner by pairing code
         const partner = await prisma.user.findUnique({ where: { pairingCode } });
         if (!partner) throw new Error('Código de vinculación inválido');
         if (partner.id === userId) throw new Error('No puedes vincularte contigo mismo');
@@ -44,6 +62,8 @@ export class CoupleService {
         return user.partner;
     }
 
+    // ── Estado del ciclo de la pareja ─────────────────────────────────
+
     static async getPartnerCycleStatus(userId: string) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -71,7 +91,9 @@ export class CoupleService {
         if (!user?.partner) throw new Error('No tienes una pareja vinculada');
 
         const { partner } = user;
+        const sharing = parseSharingSettings(partner.sharingSettings);
         const cycle = partner.cycles[0];
+
         if (!cycle) {
             return { partnerName: partner.name, hasActiveCycle: false };
         }
@@ -83,7 +105,13 @@ export class CoupleService {
         const phase = calculatePhase(currentDay);
         const daysUntilPeriod = Math.max(0, cycle.expectedLength - currentDay);
 
-        const todayLog = partner.dailyLogs[0] ?? null;
+        // Ventana fértil: ovulación ≈ día (longitud - 14)
+        const ovulationDay = Math.max(1, cycle.expectedLength - 14);
+        const fertileStart = Math.max(1, ovulationDay - 5);
+        const fertileEnd = ovulationDay;
+        const isInFertileWindow = currentDay >= fertileStart && currentDay <= fertileEnd;
+
+        const todayLog = sharing.symptoms ? (partner.dailyLogs[0] ?? null) : null;
 
         return {
             partnerName: partner.name,
@@ -93,8 +121,17 @@ export class CoupleService {
             phase,
             daysUntilPeriod,
             todayLog,
+            // Solo si la PRIMARY habilitó compartir ventana fértil
+            ...(sharing.fertileWindow && {
+                ovulationDay,
+                fertileWindowStart: fertileStart,
+                fertileWindowEnd: fertileEnd,
+                isInFertileWindow,
+            }),
         };
     }
+
+    // ── Registro diario para la pareja ────────────────────────────────
 
     static async createLogForPartner(
         userId: string,
@@ -137,6 +174,8 @@ export class CoupleService {
         return { message: 'Registro guardado exitosamente' };
     }
 
+    // ── Desvincular ───────────────────────────────────────────────────
+
     static async unlinkPartner(userId: string) {
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user || !user.partnerId) throw new Error('No tienes una pareja vinculada');
@@ -144,5 +183,23 @@ export class CoupleService {
         await prisma.user.update({ where: { id: userId }, data: { partnerId: null, role: 'PRIMARY' } });
         await prisma.user.update({ where: { id: user.partnerId }, data: { partnerId: null, role: 'PRIMARY' } });
         return { message: 'Pareja desvinculada exitosamente' };
+    }
+
+    // ── Configuración de privacidad (PRIMARY controla qué comparte) ───
+
+    static async getSharingSettings(userId: string) {
+        const user = await prisma.user.findUnique({ where: { id: userId }, select: { sharingSettings: true } });
+        if (!user) throw new Error('Usuario no encontrado');
+        return parseSharingSettings(user.sharingSettings);
+    }
+
+    static async updateSharingSettings(userId: string, settings: Partial<SharingSettings>) {
+        const current = await CoupleService.getSharingSettings(userId);
+        const updated: SharingSettings = { ...current, ...settings };
+        await prisma.user.update({
+            where: { id: userId },
+            data: { sharingSettings: JSON.stringify(updated) },
+        });
+        return updated;
     }
 }

@@ -208,10 +208,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> register(String email, String password, String name) async {
+  Future<bool> register(String email, String password, String name, {String role = 'PRIMARY'}) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final res = await _api.register(email, password, name);
+      final res = await _api.register(email, password, name, role: role);
       await _api.saveToken(res['data']['token']);
       await _db.setGuestMode(false);
       state = state.copyWith(

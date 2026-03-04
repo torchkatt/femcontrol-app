@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/home_provider.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../partner/providers/partner_provider.dart';
 import '../../../shared/services/local_db_service.dart';
 import '../../../shared/models/pet_config.dart';
 import '../../../core/theme/app_theme.dart';
@@ -14,6 +15,13 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
+    final userRole = authState.user?['role'] as String? ?? 'PRIMARY';
+
+    // PARTNER users get a different home focused on their partner's cycle
+    if (userRole == 'PARTNER' && authState.isAuthenticated) {
+      return _PartnerHomeScreen(authState: authState);
+    }
+
     final cycleAsync = ref.watch(cycleProvider);
     final todayLogAsync = ref.watch(todayLogProvider);
     final userName = authState.user?['name']?.split(' ').first;
@@ -587,6 +595,125 @@ class _ProfileSheet extends ConsumerWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// ── Home para usuarios PARTNER ────────────────────────────────────────
+class _PartnerHomeScreen extends ConsumerWidget {
+  final AuthState authState;
+  const _PartnerHomeScreen({required this.authState});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cycleAsync = ref.watch(partnerCycleStatusProvider);
+    final userName = authState.user?['name']?.split(' ').first;
+
+    return Scaffold(
+      backgroundColor: AppColors.bgCream,
+      body: SafeArea(
+        child: CustomScrollView(
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(
+                        userName != null ? 'Hola, $userName 👋' : '¡Bienvenido! 👋',
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary, letterSpacing: -0.5),
+                      ),
+                      const Text('Estado de tu pareja hoy',
+                          style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                    ]),
+                    _ProfileButton(authState: authState),
+                  ],
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: cycleAsync.when(
+                  loading: () => const _CycleHexCard(cycleData: null),
+                  error: (_, __) => _PartnerNoCycleCard(onTap: () => context.push('/partner')),
+                  data: (data) {
+                    if (data == null || data['hasActiveCycle'] == false) {
+                      return _PartnerNoCycleCard(onTap: () => context.push('/partner'));
+                    }
+                    return _CycleHexCard(cycleData: data);
+                  },
+                ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _QuickActionCard(
+                        icon: Icons.edit_note_rounded,
+                        label: 'Registrar para ella',
+                        color: AppColors.terracotta,
+                        onTap: () => context.push('/partner'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _QuickActionCard(
+                        icon: Icons.favorite_border_rounded,
+                        label: 'Ver detalles',
+                        color: const Color(0xFF9D85BE),
+                        onTap: () => context.push('/partner'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PartnerNoCycleCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _PartnerNoCycleCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [const Color(0xFF9D85BE).withOpacity(0.7), const Color(0xFF9D85BE)],
+          ),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Sin pareja vinculada',
+                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 6),
+                Text('Toca para vincular tu código',
+                    style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13)),
+              ]),
+            ),
+            const Icon(Icons.favorite_border_rounded, color: Colors.white, size: 44),
+          ],
+        ),
       ),
     );
   }

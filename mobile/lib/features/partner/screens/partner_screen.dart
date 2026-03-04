@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../providers/partner_provider.dart';
 import '../../../core/theme/app_theme.dart';
 
 // ── Consejos por fase ─────────────────────────────────────────────────
@@ -43,27 +44,6 @@ String _phaseName(String phase) => switch (phase) {
       _ => 'Lútea',
     };
 
-// ── Providers ─────────────────────────────────────────────────────────
-final _partnerInfoProvider = FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
-  final api = ref.read(apiServiceProvider);
-  try {
-    final res = await api.getPartnerInfo();
-    return res['data'];
-  } catch (_) {
-    return null;
-  }
-});
-
-final _partnerCycleProvider = FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
-  final api = ref.read(apiServiceProvider);
-  try {
-    final res = await api.getPartnerCycleStatus();
-    return res['data'] as Map<String, dynamic>?;
-  } catch (_) {
-    return null;
-  }
-});
-
 // ══════════════════════════════════════════════════════════════════════
 // PartnerScreen
 // ══════════════════════════════════════════════════════════════════════
@@ -91,8 +71,8 @@ class _PartnerScreenState extends ConsumerState<PartnerScreen> {
     try {
       final api = ref.read(apiServiceProvider);
       await api.pairPartner(code);
-      ref.invalidate(_partnerInfoProvider);
-      ref.invalidate(_partnerCycleProvider);
+      ref.invalidate(partnerInfoProvider);
+      ref.invalidate(partnerCycleStatusProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -130,8 +110,9 @@ class _PartnerScreenState extends ConsumerState<PartnerScreen> {
     if (ok == true) {
       try {
         await ref.read(apiServiceProvider).unlinkPartner();
-        ref.invalidate(_partnerInfoProvider);
-        ref.invalidate(_partnerCycleProvider);
+        ref.invalidate(partnerInfoProvider);
+        ref.invalidate(partnerCycleStatusProvider);
+        ref.invalidate(sharingSettingsProvider);
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
@@ -270,79 +251,81 @@ class _AuthenticatedPartnerView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final partnerAsync = ref.watch(_partnerInfoProvider);
+    final partnerAsync = ref.watch(partnerInfoProvider);
     final myCode = authState.user?['pairingCode'] ?? '—';
+    final userRole = authState.user?['role'] as String? ?? 'PRIMARY';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Código de vinculación
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF9D85BE), Color(0xFFB59FD4)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Tu código de vinculación',
-                  style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13),
+          // Código de vinculación — solo relevante para PRIMARY
+          if (userRole == 'PRIMARY')
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              margin: const EdgeInsets.only(bottom: 28),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF9D85BE), Color(0xFFB59FD4)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        myCode,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 2,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tu código de vinculación',
+                    style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          myCode,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 2,
+                          ),
                         ),
                       ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 20),
-                      tooltip: 'Copiar código',
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: myCode)).then((_) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('¡Código copiado al portapapeles! 📋'),
-                                duration: Duration(seconds: 2),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                Text(
-                  'Comparte este código con tu pareja para vincularse',
-                  style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12),
-                ),
-              ],
+                      IconButton(
+                        icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 20),
+                        tooltip: 'Copiar código',
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: myCode)).then((_) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('¡Código copiado al portapapeles! 📋'),
+                                  duration: Duration(seconds: 2),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                  Text(
+                    'Comparte este código con tu pareja para vincularse',
+                    style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 28),
           partnerAsync.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (_, __) => _NoPairedCard(codeCtrl: codeCtrl, onPair: onPair, linking: linking),
             data: (partner) => partner == null
                 ? _NoPairedCard(codeCtrl: codeCtrl, onPair: onPair, linking: linking)
-                : _PairedPartnerView(partner: partner, onUnlink: onUnlink),
+                : _PairedPartnerView(partner: partner, onUnlink: onUnlink, userRole: userRole),
           ),
         ],
       ),
@@ -420,11 +403,12 @@ class _NoPairedCard extends StatelessWidget {
 class _PairedPartnerView extends ConsumerWidget {
   final Map<String, dynamic> partner;
   final VoidCallback onUnlink;
-  const _PairedPartnerView({required this.partner, required this.onUnlink});
+  final String userRole;
+  const _PairedPartnerView({required this.partner, required this.onUnlink, required this.userRole});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final cycleAsync = ref.watch(_partnerCycleProvider);
+    final cycleAsync = ref.watch(partnerCycleStatusProvider);
 
     return Column(
       children: [
@@ -448,6 +432,11 @@ class _PairedPartnerView extends ConsumerWidget {
           },
           orElse: () => const SizedBox.shrink(),
         ),
+        // Configuración de privacidad — solo para PRIMARY
+        if (userRole == 'PRIMARY') ...[
+          const SizedBox(height: 16),
+          const _SharingSettingsCard(),
+        ],
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
@@ -615,6 +604,162 @@ class _CycleStat extends StatelessWidget {
           label,
           style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11),
         ),
+      ],
+    );
+  }
+}
+
+// ── Configuración de privacidad ───────────────────────────────────────
+class _SharingSettingsCard extends ConsumerStatefulWidget {
+  const _SharingSettingsCard();
+
+  @override
+  ConsumerState<_SharingSettingsCard> createState() => _SharingSettingsCardState();
+}
+
+class _SharingSettingsCardState extends ConsumerState<_SharingSettingsCard> {
+  bool _savingFw = false;
+  bool _savingSy = false;
+
+  Future<void> _toggle(String field, bool value) async {
+    setState(() => field == 'fertileWindow' ? _savingFw = true : _savingSy = true);
+    try {
+      await ref.read(apiServiceProvider).updateSharingSettings(
+        fertileWindow: field == 'fertileWindow' ? value : null,
+        symptoms: field == 'symptoms' ? value : null,
+      );
+      ref.invalidate(sharingSettingsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Configuración guardada'),
+            backgroundColor: AppColors.sage,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      if (mounted) setState(() => field == 'fertileWindow' ? _savingFw = false : _savingSy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settingsAsync = ref.watch(sharingSettingsProvider);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.bgCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.lock_outline_rounded, size: 18, color: AppColors.textSecondary),
+              const SizedBox(width: 8),
+              const Text(
+                'Privacidad',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '¿Qué puede ver tu pareja de tu ciclo?',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          settingsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (_, __) => const Text('No se pudo cargar la configuración',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            data: (settings) {
+              final fw = settings['fertileWindow'] as bool? ?? true;
+              final sy = settings['symptoms'] as bool? ?? false;
+              return Column(
+                children: [
+                  _SettingRow(
+                    icon: Icons.calendar_month_rounded,
+                    title: 'Ventana fértil',
+                    subtitle: 'Tu pareja verá cuándo eres más fértil',
+                    value: fw,
+                    loading: _savingFw,
+                    onChanged: (v) => _toggle('fertileWindow', v),
+                  ),
+                  const SizedBox(height: 12),
+                  _SettingRow(
+                    icon: Icons.medication_liquid_rounded,
+                    title: 'Síntomas del día',
+                    subtitle: 'Tu pareja verá tu registro diario',
+                    value: sy,
+                    loading: _savingSy,
+                    onChanged: (v) => _toggle('symptoms', v),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final bool loading;
+  final ValueChanged<bool> onChanged;
+
+  const _SettingRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.loading,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.terracotta.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, size: 20, color: AppColors.terracotta),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+              Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+            ],
+          ),
+        ),
+        loading
+            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+            : Switch(
+                value: value,
+                onChanged: onChanged,
+                activeColor: AppColors.terracotta,
+              ),
       ],
     );
   }

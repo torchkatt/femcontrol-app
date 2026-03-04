@@ -18,6 +18,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _obscure = true;
+  String _role = 'PRIMARY';
 
   @override
   void dispose() {
@@ -54,7 +55,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       );
       return;
     }
-    final ok = await ref.read(authProvider.notifier).register(email, password, name);
+    final ok = await ref.read(authProvider.notifier).register(email, password, name, role: _role);
     if (ok && mounted) context.go('/home');
   }
 
@@ -86,7 +87,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               const SizedBox(height: 6),
               const Text('Empieza tu camino hacia el bienestar',
                   style: TextStyle(color: AppColors.textSecondary, fontSize: 15)),
-              const SizedBox(height: 36),
+              const SizedBox(height: 28),
               if (state.error != null)
                 Container(
                   padding: const EdgeInsets.all(14),
@@ -97,6 +98,36 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   child: Text(state.error!, style: const TextStyle(color: AppColors.terracottaDark, fontSize: 14)),
                 ),
+              // ── Selector de rol ────────────────────────────────────
+              const Text(
+                '¿Cuál es tu rol?',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _RoleCard(
+                      emoji: '🌸',
+                      title: 'Soy la principal',
+                      subtitle: 'Registro mi propio ciclo',
+                      selected: _role == 'PRIMARY',
+                      onTap: () => setState(() => _role = 'PRIMARY'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _RoleCard(
+                      emoji: '💙',
+                      title: 'Soy la pareja',
+                      subtitle: 'Apoyo a mi pareja',
+                      selected: _role == 'PARTNER',
+                      onTap: () => setState(() => _role = 'PARTNER'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
               // ── Info nube ─────────────────────────────────────
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -162,6 +193,62 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleCard extends StatelessWidget {
+  final String emoji;
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _RoleCard({
+    required this.emoji,
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.terracotta.withOpacity(0.08) : AppColors.bgCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? AppColors.terracotta : AppColors.divider,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 32)),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: selected ? AppColors.terracottaDark : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+            ),
+          ],
         ),
       ),
     );

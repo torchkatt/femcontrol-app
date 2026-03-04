@@ -46,8 +46,8 @@ class ApiService {
   }
 
   // Auth
-  Future<Map<String, dynamic>> register(String email, String password, String name) async {
-    final res = await _dio.post('/auth/register', data: {'email': email, 'password': password, 'name': name});
+  Future<Map<String, dynamic>> register(String email, String password, String name, {String role = 'PRIMARY'}) async {
+    final res = await _dio.post('/auth/register', data: {'email': email, 'password': password, 'name': name, 'role': role});
     return res.data;
   }
 
@@ -133,6 +133,19 @@ class ApiService {
 
   Future<void> unlinkPartner() async {
     await _dio.delete('/couple/unlink');
+  }
+
+  Future<Map<String, dynamic>> getSharingSettings() async {
+    final res = await _dio.get('/couple/sharing');
+    return res.data;
+  }
+
+  Future<Map<String, dynamic>> updateSharingSettings({bool? fertileWindow, bool? symptoms}) async {
+    final res = await _dio.put('/couple/sharing', data: {
+      if (fertileWindow != null) 'fertileWindow': fertileWindow,
+      if (symptoms != null) 'symptoms': symptoms,
+    });
+    return res.data;
   }
 
   Future<Map<String, dynamic>> getPartnerCycleStatus() async {

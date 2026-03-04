@@ -24,13 +24,13 @@ const safeUserSelect = {
 } as const;
 
 export class AuthService {
-    static async register(email: string, password: string, name: string) {
+    static async register(email: string, password: string, name: string, role: 'PRIMARY' | 'PARTNER' = 'PRIMARY') {
         const existing = await prisma.user.findUnique({ where: { email } });
         if (existing) throw new Error('Este correo ya está registrado');
 
         const passwordHash = await bcrypt.hash(password, 12);
         const user = await prisma.user.create({
-            data: { email, name, passwordHash },
+            data: { email, name, passwordHash, role },
             select: safeUserSelect,
         });
 

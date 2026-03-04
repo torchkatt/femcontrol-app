@@ -12,9 +12,10 @@ model User {
   name          String
   passwordHash  String?  // null for OAuth users
   googleId      String?  @unique
-  role          Role       @default(PRIMARY)
-  pairingCode   String     @unique @default(cuid())
-  partnerId     String?    @unique
+  role             Role       @default(PRIMARY)
+  pairingCode      String     @unique @default(cuid())
+  partnerId        String?    @unique
+  sharingSettings  String?    // JSON: { "fertileWindow": bool, "symptoms": bool }
   partner       User?      @relation("CoupleLink", fields: [partnerId], references: [id])
   linkedPartner User?      @relation("CoupleLink")
   cycles        Cycle[]

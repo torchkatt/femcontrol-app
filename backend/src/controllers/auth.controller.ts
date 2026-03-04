@@ -4,12 +4,13 @@ import { AuthRequest } from '../middleware/auth.middleware';
 
 export const register = async (req: Request, res: Response) => {
     try {
-        const { email, password, name } = req.body;
+        const { email, password, name, role } = req.body;
         if (!email || !password || !name) {
             res.status(400).json({ success: false, message: 'Email, contraseña y nombre son requeridos' });
             return;
         }
-        const result = await AuthService.register(email, password, name);
+        const validRole = role === 'PARTNER' ? 'PARTNER' : 'PRIMARY';
+        const result = await AuthService.register(email, password, name, validRole);
         res.status(201).json({ success: true, data: result });
     } catch (error: any) {
         const isDuplicate = error.message?.includes('ya está registrado');
