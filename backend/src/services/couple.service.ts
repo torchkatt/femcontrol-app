@@ -19,9 +19,9 @@ export class CoupleService {
         if (!currentUser) throw new Error('Usuario no encontrado');
         if (currentUser.partnerId) throw new Error('Ya tienes una pareja vinculada');
 
-        // Link both users to each other
-        await prisma.user.update({ where: { id: userId }, data: { partnerId: partner.id } });
-        await prisma.user.update({ where: { id: partner.id }, data: { partnerId: userId } });
+        // Caller becomes PARTNER (viewer); the code owner stays PRIMARY
+        await prisma.user.update({ where: { id: userId }, data: { partnerId: partner.id, role: 'PARTNER' } });
+        await prisma.user.update({ where: { id: partner.id }, data: { partnerId: userId, role: 'PRIMARY' } });
 
         return { message: 'Pareja vinculada exitosamente', partnerId: partner.id, partnerName: partner.name };
     }
@@ -141,8 +141,8 @@ export class CoupleService {
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user || !user.partnerId) throw new Error('No tienes una pareja vinculada');
 
-        await prisma.user.update({ where: { id: userId }, data: { partnerId: null } });
-        await prisma.user.update({ where: { id: user.partnerId }, data: { partnerId: null } });
+        await prisma.user.update({ where: { id: userId }, data: { partnerId: null, role: 'PRIMARY' } });
+        await prisma.user.update({ where: { id: user.partnerId }, data: { partnerId: null, role: 'PRIMARY' } });
         return { message: 'Pareja desvinculada exitosamente' };
     }
 }
