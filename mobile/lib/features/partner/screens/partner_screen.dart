@@ -6,6 +6,31 @@ import '../../auth/providers/auth_provider.dart';
 import '../providers/partner_provider.dart';
 import '../../../core/theme/app_theme.dart';
 
+// ── Error parser ───────────────────────────────────────────────────────
+String _parseApiError(dynamic e) {
+  final str = e.toString();
+  if (str.contains('SocketException') ||
+      str.contains('Connection refused') ||
+      str.contains('failed host lookup') ||
+      str.contains('Network is unreachable')) {
+    return 'Sin conexión al servidor';
+  }
+  if (str.contains('DioException')) {
+    if (str.contains('404')) return 'Esta función no está disponible aún en el servidor';
+    if (str.contains('401')) return 'Sesión expirada, vuelve a iniciar sesión';
+    if (str.contains('timed out') || str.contains('connection timeout')) {
+      return 'El servidor está iniciando, intenta de nuevo en un momento';
+    }
+    try {
+      final data = (e as dynamic).response?.data;
+      final msg = data?['message'] as String?;
+      if (msg != null && msg.isNotEmpty) return msg;
+    } catch (_) {}
+    return 'Error de conexión con el servidor';
+  }
+  return str.replaceAll('Exception: ', '');
+}
+
 // ── Consejos por fase ─────────────────────────────────────────────────
 const _phaseAdvice = <String, List<(String, IconData)>>{
   'menstrual': [
@@ -66,7 +91,12 @@ class _PartnerScreenState extends ConsumerState<PartnerScreen> {
 
   Future<void> _pair() async {
     final code = _codeCtrl.text.trim();
-    if (code.isEmpty) return;
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresa un código de vinculación')),
+      );
+      return;
+    }
     setState(() => _linking = true);
     try {
       final api = ref.read(apiServiceProvider);
@@ -84,7 +114,9 @@ class _PartnerScreenState extends ConsumerState<PartnerScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_parseApiError(e))),
+        );
       }
     } finally {
       if (mounted) setState(() => _linking = false);
@@ -96,7 +128,7 @@ class _PartnerScreenState extends ConsumerState<PartnerScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Desvincular pareja'),
-        content: const Text('¿Estás segura de que quieres desvincularte de tu pareja?'),
+        content: const Text('¿Estás segura de que quieres desvincularte? Ambos volverán a ser cuentas independientes.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
           TextButton(
@@ -113,8 +145,13 @@ class _PartnerScreenState extends ConsumerState<PartnerScreen> {
         ref.invalidate(partnerInfoProvider);
         ref.invalidate(partnerCycleStatusProvider);
         ref.invalidate(sharingSettingsProvider);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Desvinculado exitosamente')),
+          );
+        }
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_parseApiError(e))));
       }
     }
   }
@@ -224,16 +261,18 @@ class _FeatureRow extends StatelessWidget {
           child: Icon(icon, size: 20, color: const Color(0xFF9D85BE)),
         ),
         const SizedBox(width: 14),
-        Text(
-          text,
-          style: const TextStyle(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 14, color: AppColors.textPrimary, fontWeight: FontWeight.w500),
+          ),
         ),
       ],
     );
   }
 }
 
-// ── Vista para usuarios autenticados ─────────────────────────────────
+// ── Vista autenticada ─────────────────────────────────────────────────
 class _AuthenticatedPartnerView extends ConsumerWidget {
   final TextEditingController codeCtrl;
   final VoidCallback onPair;
@@ -252,80 +291,45 @@ class _AuthenticatedPartnerView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final partnerAsync = ref.watch(partnerInfoProvider);
-    final myCode = authState.user?['pairingCode'] ?? '—';
     final userRole = authState.user?['role'] as String? ?? 'PRIMARY';
+    final myCode = authState.user?['pairingCode'] ?? '—';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Código de vinculación — solo relevante para PRIMARY
+          // Código de vinculación — PRIMARY comparte, PARTNER usa el de su pareja
           if (userRole == 'PRIMARY')
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              margin: const EdgeInsets.only(bottom: 28),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF9D85BE), Color(0xFFB59FD4)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Tu código de vinculación',
-                    style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13),
-                  ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          myCode,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 20),
-                        tooltip: 'Copiar código',
-                        onPressed: () {
-                          Clipboard.setData(ClipboardData(text: myCode)).then((_) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('¡Código copiado al portapapeles! 📋'),
-                                  duration: Duration(seconds: 2),
-                                  behavior: SnackBarBehavior.floating,
-                                ),
-                              );
-                            }
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  Text(
-                    'Comparte este código con tu pareja para vincularse',
-                    style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 12),
-                  ),
-                ],
+            _PairingCodeCard(code: myCode)
+          else
+            _PartnerRoleInfoBanner(),
+          const SizedBox(height: 24),
+          partnerAsync.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(40),
+                child: CircularProgressIndicator(),
               ),
             ),
-          partnerAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => _NoPairedCard(codeCtrl: codeCtrl, onPair: onPair, linking: linking),
+            error: (_, __) => _NoPairedCard(
+              codeCtrl: codeCtrl,
+              onPair: onPair,
+              linking: linking,
+              userRole: userRole,
+            ),
             data: (partner) => partner == null
-                ? _NoPairedCard(codeCtrl: codeCtrl, onPair: onPair, linking: linking)
-                : _PairedPartnerView(partner: partner, onUnlink: onUnlink, userRole: userRole),
+                ? _NoPairedCard(
+                    codeCtrl: codeCtrl,
+                    onPair: onPair,
+                    linking: linking,
+                    userRole: userRole,
+                  )
+                : _PairedPartnerView(
+                    partner: partner,
+                    onUnlink: onUnlink,
+                    userRole: userRole,
+                  ),
           ),
         ],
       ),
@@ -333,19 +337,150 @@ class _AuthenticatedPartnerView extends ConsumerWidget {
   }
 }
 
-// ── Sin pareja ────────────────────────────────────────────────────────
+// ── Card del código de vinculación (PRIMARY) ──────────────────────────
+class _PairingCodeCard extends StatelessWidget {
+  final String code;
+  const _PairingCodeCard({required this.code});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF9D85BE), Color(0xFFB59FD4)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.link_rounded, color: Colors.white, size: 14),
+                    SizedBox(width: 4),
+                    Text('Tu código de vinculación',
+                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  code,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy_rounded, color: Colors.white, size: 20),
+                tooltip: 'Copiar código',
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: code)).then((_) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Código copiado 📋'),
+                          duration: Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  });
+                },
+              ),
+            ],
+          ),
+          Text(
+            'Comparte este código con tu pareja para vincularse',
+            style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, height: 1.4),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Banner informativo para PARTNER ──────────────────────────────────
+class _PartnerRoleInfoBanner extends StatelessWidget {
+  const _PartnerRoleInfoBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.terracotta.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.terracotta.withOpacity(0.2)),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('💙', style: TextStyle(fontSize: 24)),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Modo pareja',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+                SizedBox(height: 4),
+                Text(
+                  'Ingresa el código de vinculación de tu pareja para ver su ciclo y apoyarla mejor.',
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Sin pareja (role-aware) ───────────────────────────────────────────
 class _NoPairedCard extends StatelessWidget {
   final TextEditingController codeCtrl;
   final VoidCallback onPair;
   final bool linking;
-  const _NoPairedCard({required this.codeCtrl, required this.onPair, required this.linking});
+  final String userRole;
+
+  const _NoPairedCard({
+    required this.codeCtrl,
+    required this.onPair,
+    required this.linking,
+    required this.userRole,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isPrimary = userRole == 'PRIMARY';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
+          width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: AppColors.bgCard,
@@ -355,28 +490,44 @@ class _NoPairedCard extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Icon(Icons.favorite_border_rounded, size: 40, color: AppColors.terracotta),
             const SizedBox(height: 12),
-            const Text(
-              'Sin pareja vinculada',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+            Text(
+              isPrimary ? 'Sin pareja vinculada' : 'Aún no estás vinculado',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
             ),
             const SizedBox(height: 6),
-            const Text(
-              'Vincula a tu pareja para que pueda ver tu estado de ciclo y apoyarte mejor.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.5),
+            Text(
+              isPrimary
+                  ? 'Vincula a tu pareja para que pueda ver tu ciclo y apoyarte mejor.'
+                  : 'Pide a tu pareja que te comparta su código de vinculación.',
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.5),
             ),
           ]),
         ),
         const SizedBox(height: 20),
-        const Text(
-          'Ingresar código de pareja',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textPrimary),
+        Text(
+          isPrimary ? 'Código de tu pareja' : 'Código de vinculación',
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textPrimary),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          isPrimary
+              ? 'Pídele a tu pareja que abra la app y comparta su código'
+              : 'Ingresa el código que te compartió tu pareja',
+          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: codeCtrl,
-          decoration: const InputDecoration(
+          textCapitalization: TextCapitalization.none,
+          decoration: InputDecoration(
             hintText: 'Pega o escribe el código aquí',
-            prefixIcon: Icon(Icons.vpn_key_outlined),
+            prefixIcon: const Icon(Icons.vpn_key_outlined),
+            suffixIcon: codeCtrl.text.isNotEmpty
+                ? IconButton(
+                    icon: const Icon(Icons.clear_rounded),
+                    onPressed: () => codeCtrl.clear(),
+                  )
+                : null,
           ),
         ),
         const SizedBox(height: 14),
@@ -384,14 +535,10 @@ class _NoPairedCard extends StatelessWidget {
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: linking ? null : onPair,
-            icon: linking ? const SizedBox.shrink() : const Icon(Icons.favorite_rounded, size: 18),
-            label: linking
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Text('Vincular pareja'),
+            icon: linking
+                ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.favorite_rounded, size: 18),
+            label: Text(linking ? 'Vinculando...' : 'Vincular pareja'),
           ),
         ),
       ],
@@ -404,7 +551,12 @@ class _PairedPartnerView extends ConsumerWidget {
   final Map<String, dynamic> partner;
   final VoidCallback onUnlink;
   final String userRole;
-  const _PairedPartnerView({required this.partner, required this.onUnlink, required this.userRole});
+
+  const _PairedPartnerView({
+    required this.partner,
+    required this.onUnlink,
+    required this.userRole,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -437,7 +589,7 @@ class _PairedPartnerView extends ConsumerWidget {
           const SizedBox(height: 16),
           const _SharingSettingsCard(),
         ],
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         SizedBox(
           width: double.infinity,
           child: OutlinedButton.icon(
@@ -450,7 +602,7 @@ class _PairedPartnerView extends ConsumerWidget {
             ),
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 32),
       ],
     );
   }
@@ -470,6 +622,7 @@ class _PartnerCycleCard extends StatelessWidget {
     final expectedLength = cycle['expectedLength'] as int? ?? 28;
     final daysUntilPeriod = cycle['daysUntilPeriod'] as int? ?? 0;
     final advice = _phaseAdvice[phase] ?? _phaseAdvice['lutea']!;
+    final isInFertile = cycle['isInFertileWindow'] as bool? ?? false;
 
     return Container(
       width: double.infinity,
@@ -481,11 +634,7 @@ class _PartnerCycleCard extends StatelessWidget {
         ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(
-            color: phaseColor.withOpacity(0.30),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
+          BoxShadow(color: phaseColor.withOpacity(0.30), blurRadius: 16, offset: const Offset(0, 6)),
         ],
       ),
       child: Padding(
@@ -499,41 +648,45 @@ class _PartnerCycleCard extends StatelessWidget {
                 Container(
                   width: 46,
                   height: 46,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.25),
-                    shape: BoxShape.circle,
-                  ),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.25), shape: BoxShape.circle),
                   child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
+                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.25),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text('Fase ${_phaseName(phase)}',
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
+                          ),
+                          if (isInFertile) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text('🌟 Fértil',
+                                  style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                            ),
+                          ],
+                        ],
                       ),
-                    ),
-                    Container(
-                      margin: const EdgeInsets.only(top: 4),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        'Fase ${_phaseName(phase)}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -544,7 +697,10 @@ class _PartnerCycleCard extends StatelessWidget {
               children: [
                 _CycleStat(label: 'Día del ciclo', value: '$currentDay de $expectedLength'),
                 Container(width: 1, height: 36, color: Colors.white.withOpacity(0.3)),
-                _CycleStat(label: 'Próximo período', value: 'En $daysUntilPeriod días'),
+                _CycleStat(
+                  label: 'Próximo período',
+                  value: daysUntilPeriod == 0 ? '¡Hoy!' : 'En $daysUntilPeriod días',
+                ),
               ],
             ),
             const SizedBox(height: 20),
@@ -553,11 +709,7 @@ class _PartnerCycleCard extends StatelessWidget {
             // Consejos
             Text(
               'Cómo cuidarla hoy',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 10),
             ...advice.map((tip) => Padding(
@@ -567,14 +719,9 @@ class _PartnerCycleCard extends StatelessWidget {
                       Icon(tip.$2, color: Colors.white, size: 18),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          tip.$1,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        child: Text(tip.$1,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
                       ),
                     ],
                   ),
@@ -595,15 +742,10 @@ class _CycleStat extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
-        ),
+        Text(value,
+            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
         const SizedBox(height: 2),
-        Text(
-          label,
-          style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11),
-        ),
+        Text(label, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11)),
       ],
     );
   }
@@ -629,17 +771,11 @@ class _SharingSettingsCardState extends ConsumerState<_SharingSettingsCard> {
         symptoms: field == 'symptoms' ? value : null,
       );
       ref.invalidate(sharingSettingsProvider);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Configuración guardada'),
-            backgroundColor: AppColors.sage,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      final msg = _parseApiError(e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
     } finally {
       if (mounted) setState(() => field == 'fertileWindow' ? _savingFw = false : _savingSy = false);
     }
@@ -664,23 +800,21 @@ class _SharingSettingsCardState extends ConsumerState<_SharingSettingsCard> {
             children: [
               const Icon(Icons.lock_outline_rounded, size: 18, color: AppColors.textSecondary),
               const SizedBox(width: 8),
-              const Text(
-                'Privacidad',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-              ),
+              const Text('Privacidad',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
             ],
           ),
           const SizedBox(height: 4),
-          const Text(
-            '¿Qué puede ver tu pareja de tu ciclo?',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
+          const Text('¿Qué puede ver tu pareja de tu ciclo?',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           const SizedBox(height: 16),
           settingsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const Text('No se pudo cargar la configuración',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+            loading: () => const Center(
+              child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()),
+            ),
+            error: (_, __) => _BackendUnavailableNotice(),
             data: (settings) {
+              if (settings == null) return _BackendUnavailableNotice();
               final fw = settings['fertileWindow'] as bool? ?? true;
               final sy = settings['symptoms'] as bool? ?? false;
               return Column(
@@ -705,6 +839,34 @@ class _SharingSettingsCardState extends ConsumerState<_SharingSettingsCard> {
                 ],
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BackendUnavailableNotice extends StatelessWidget {
+  const _BackendUnavailableNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.sage.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.sage.withOpacity(0.25)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.info_outline_rounded, color: AppColors.sageDark, size: 18),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Esta función estará disponible en la próxima actualización del servidor.',
+              style: TextStyle(fontSize: 12, color: AppColors.sageDark, height: 1.4),
+            ),
           ),
         ],
       ),
@@ -748,18 +910,15 @@ class _SettingRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
               Text(subtitle, style: const TextStyle(fontSize: 11, color: AppColors.textSecondary)),
             ],
           ),
         ),
         loading
             ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-            : Switch(
-                value: value,
-                onChanged: onChanged,
-                activeColor: AppColors.terracotta,
-              ),
+            : Switch(value: value, onChanged: onChanged, activeColor: AppColors.terracotta),
       ],
     );
   }
@@ -821,7 +980,9 @@ class _PartnerLogCardState extends ConsumerState<_PartnerLogCard> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(_parseApiError(e))),
+        );
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -841,105 +1002,70 @@ class _PartnerLogCardState extends ConsumerState<_PartnerLogCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Registrar síntomas de hoy',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+          Row(
+            children: [
+              const Icon(Icons.edit_note_rounded, size: 22, color: AppColors.terracotta),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text('Registrar síntomas de hoy',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+              ),
+            ],
           ),
-          const SizedBox(height: 2),
-          Text(
+          const SizedBox(height: 4),
+          const Text(
             'Ayúdala llevando el registro',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary.withOpacity(0.7)),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           // Flujo
-          const Text(
-            'Flujo',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-          ),
+          _SectionLabel(label: 'Flujo'),
           const SizedBox(height: 8),
           Row(
             children: [
-              _LevelButton(
-                label: 'Sin flujo',
-                level: 0,
-                selected: _flow == 0,
-                onTap: () => setState(() => _flow = _flow == 0 ? null : 0),
-                colors: const [Color(0xFFBDBDBD), Color(0xFFFFB74D), Color(0xFFEF9A9A), AppColors.terracotta],
-              ),
+              _LevelButton(label: 'Sin flujo', level: 0, selected: _flow == 0,
+                  onTap: () => setState(() => _flow = _flow == 0 ? null : 0),
+                  colors: const [Color(0xFFBDBDBD), Color(0xFFFFB74D), Color(0xFFEF9A9A), AppColors.terracotta]),
               const SizedBox(width: 6),
-              _LevelButton(
-                label: 'Leve',
-                level: 1,
-                selected: _flow == 1,
-                onTap: () => setState(() => _flow = _flow == 1 ? null : 1),
-                colors: const [Color(0xFFBDBDBD), Color(0xFFFFB74D), Color(0xFFEF9A9A), AppColors.terracotta],
-              ),
+              _LevelButton(label: 'Leve', level: 1, selected: _flow == 1,
+                  onTap: () => setState(() => _flow = _flow == 1 ? null : 1),
+                  colors: const [Color(0xFFBDBDBD), Color(0xFFFFB74D), Color(0xFFEF9A9A), AppColors.terracotta]),
               const SizedBox(width: 6),
-              _LevelButton(
-                label: 'Moderado',
-                level: 2,
-                selected: _flow == 2,
-                onTap: () => setState(() => _flow = _flow == 2 ? null : 2),
-                colors: const [Color(0xFFBDBDBD), Color(0xFFFFB74D), Color(0xFFEF9A9A), AppColors.terracotta],
-              ),
+              _LevelButton(label: 'Moderado', level: 2, selected: _flow == 2,
+                  onTap: () => setState(() => _flow = _flow == 2 ? null : 2),
+                  colors: const [Color(0xFFBDBDBD), Color(0xFFFFB74D), Color(0xFFEF9A9A), AppColors.terracotta]),
               const SizedBox(width: 6),
-              _LevelButton(
-                label: 'Abundante',
-                level: 3,
-                selected: _flow == 3,
-                onTap: () => setState(() => _flow = _flow == 3 ? null : 3),
-                colors: const [Color(0xFFBDBDBD), Color(0xFFFFB74D), Color(0xFFEF9A9A), AppColors.terracotta],
-              ),
+              _LevelButton(label: 'Abundante', level: 3, selected: _flow == 3,
+                  onTap: () => setState(() => _flow = _flow == 3 ? null : 3),
+                  colors: const [Color(0xFFBDBDBD), Color(0xFFFFB74D), Color(0xFFEF9A9A), AppColors.terracotta]),
             ],
           ),
           const SizedBox(height: 16),
           // Dolor
-          const Text(
-            'Dolor',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-          ),
+          _SectionLabel(label: 'Dolor'),
           const SizedBox(height: 8),
           Row(
             children: [
-              _LevelButton(
-                label: 'Sin dolor',
-                level: 0,
-                selected: _pain == 0,
-                onTap: () => setState(() => _pain = _pain == 0 ? null : 0),
-                colors: const [Color(0xFFBDBDBD), Color(0xFF81C784), Color(0xFFFFB74D), Color(0xFFE57373)],
-              ),
+              _LevelButton(label: 'Sin dolor', level: 0, selected: _pain == 0,
+                  onTap: () => setState(() => _pain = _pain == 0 ? null : 0),
+                  colors: const [Color(0xFFBDBDBD), Color(0xFF81C784), Color(0xFFFFB74D), Color(0xFFE57373)]),
               const SizedBox(width: 6),
-              _LevelButton(
-                label: 'Leve',
-                level: 1,
-                selected: _pain == 1,
-                onTap: () => setState(() => _pain = _pain == 1 ? null : 1),
-                colors: const [Color(0xFFBDBDBD), Color(0xFF81C784), Color(0xFFFFB74D), Color(0xFFE57373)],
-              ),
+              _LevelButton(label: 'Leve', level: 1, selected: _pain == 1,
+                  onTap: () => setState(() => _pain = _pain == 1 ? null : 1),
+                  colors: const [Color(0xFFBDBDBD), Color(0xFF81C784), Color(0xFFFFB74D), Color(0xFFE57373)]),
               const SizedBox(width: 6),
-              _LevelButton(
-                label: 'Moderado',
-                level: 2,
-                selected: _pain == 2,
-                onTap: () => setState(() => _pain = _pain == 2 ? null : 2),
-                colors: const [Color(0xFFBDBDBD), Color(0xFF81C784), Color(0xFFFFB74D), Color(0xFFE57373)],
-              ),
+              _LevelButton(label: 'Moderado', level: 2, selected: _pain == 2,
+                  onTap: () => setState(() => _pain = _pain == 2 ? null : 2),
+                  colors: const [Color(0xFFBDBDBD), Color(0xFF81C784), Color(0xFFFFB74D), Color(0xFFE57373)]),
               const SizedBox(width: 6),
-              _LevelButton(
-                label: 'Fuerte',
-                level: 3,
-                selected: _pain == 3,
-                onTap: () => setState(() => _pain = _pain == 3 ? null : 3),
-                colors: const [Color(0xFFBDBDBD), Color(0xFF81C784), Color(0xFFFFB74D), Color(0xFFE57373)],
-              ),
+              _LevelButton(label: 'Fuerte', level: 3, selected: _pain == 3,
+                  onTap: () => setState(() => _pain = _pain == 3 ? null : 3),
+                  colors: const [Color(0xFFBDBDBD), Color(0xFF81C784), Color(0xFFFFB74D), Color(0xFFE57373)]),
             ],
           ),
           const SizedBox(height: 16),
           // Estado de ánimo
-          const Text(
-            'Estado de ánimo',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
-          ),
+          _SectionLabel(label: 'Estado de ánimo'),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -947,13 +1073,7 @@ class _PartnerLogCardState extends ConsumerState<_PartnerLogCard> {
             children: _moods.map((m) {
               final isSelected = _mood.contains(m.$2);
               return GestureDetector(
-                onTap: () => setState(() {
-                  if (isSelected) {
-                    _mood.remove(m.$2);
-                  } else {
-                    _mood.add(m.$2);
-                  }
-                }),
+                onTap: () => setState(() => isSelected ? _mood.remove(m.$2) : _mood.add(m.$2)),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -983,16 +1103,25 @@ class _PartnerLogCardState extends ConsumerState<_PartnerLogCard> {
             child: ElevatedButton(
               onPressed: _saving ? null : _save,
               child: _saving
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
+                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Text('Guardar registro'),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  const _SectionLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
     );
   }
 }
@@ -1003,6 +1132,7 @@ class _LevelButton extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final List<Color> colors;
+
   const _LevelButton({
     required this.label,
     required this.level,
@@ -1040,7 +1170,7 @@ class _LevelButton extends StatelessWidget {
   }
 }
 
-// ── Loading / Error ───────────────────────────────────────────────────
+// ── Loading / Error states ─────────────────────────────────────────────
 class _CycleLoadingCard extends StatelessWidget {
   final String partnerName;
   const _CycleLoadingCard({required this.partnerName});
@@ -1049,7 +1179,7 @@ class _CycleLoadingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         color: AppColors.bgCard,
         borderRadius: BorderRadius.circular(20),
@@ -1057,8 +1187,9 @@ class _CycleLoadingCard extends StatelessWidget {
       ),
       child: Column(children: [
         const CircularProgressIndicator(),
-        const SizedBox(height: 12),
-        Text('Cargando ciclo de $partnerName…', style: const TextStyle(color: AppColors.textSecondary)),
+        const SizedBox(height: 14),
+        Text('Cargando ciclo de $partnerName…',
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 14)),
       ]),
     );
   }
@@ -1082,28 +1213,33 @@ class _CycleErrorCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: 50,
+            height: 50,
             decoration: BoxDecoration(
               color: const Color(0xFF9D85BE).withOpacity(0.12),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.favorite_rounded, color: Color(0xFF9D85BE), size: 24),
+            child: const Icon(Icons.favorite_rounded, color: Color(0xFF9D85BE), size: 26),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(
-                partnerName,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
-              ),
+              Text(partnerName,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
               const SizedBox(height: 4),
               Text(
                 noData
-                    ? 'Aún no tiene un ciclo activo registrado'
+                    ? 'Aún no ha registrado un ciclo activo'
                     : 'No se pudo cargar el ciclo',
                 style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
               ),
+              if (noData) ...[
+                const SizedBox(height: 4),
+                const Text(
+                  'Cuando registre su ciclo, aparecerá aquí',
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                ),
+              ],
             ]),
           ),
         ],

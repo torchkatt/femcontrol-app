@@ -1,25 +1,28 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_constants.dart';
+
+const _kTokenKey = 'auth_token';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
   ApiService._internal();
 
-  final _storage = const FlutterSecureStorage();
   late final Dio _dio = Dio(BaseOptions(
     baseUrl: AppConstants.baseUrl,
     connectTimeout: const Duration(seconds: 90),
     receiveTimeout: const Duration(seconds: 30),
     headers: {
       'Content-Type': 'application/json',
-      'Bypass-Tunnel-Reminder': 'true',
     },
   ))..interceptors.add(
     InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = await _storage.read(key: 'token');
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString(_kTokenKey);
+        if (kDebugMode) debugPrint('[ApiService] Token: ${token != null ? "present" : "null"}');
         if (token != null) {
           options.headers['Authorization'] = 'Bearer $token';
         }
@@ -31,9 +34,20 @@ class ApiService {
     ),
   );
 
-  Future<void> saveToken(String token) => _storage.write(key: 'token', value: token);
-  Future<String?> getToken() => _storage.read(key: 'token');
-  Future<void> deleteToken() => _storage.delete(key: 'token');
+  Future<void> saveToken(String token) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kTokenKey, token);
+  }
+
+  Future<String?> getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_kTokenKey);
+  }
+
+  Future<void> deleteToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_kTokenKey);
+  }
 
   Future<void> warmup() async {
     try {

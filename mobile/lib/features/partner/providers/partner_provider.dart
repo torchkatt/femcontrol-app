@@ -21,12 +21,13 @@ final partnerCycleStatusProvider = FutureProvider.autoDispose<Map<String, dynami
   }
 });
 
-final sharingSettingsProvider = FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+/// Returns null if the backend doesn't have this route yet (graceful degradation).
+final sharingSettingsProvider = FutureProvider.autoDispose<Map<String, dynamic>?>((ref) async {
   final api = ref.read(apiServiceProvider);
   try {
     final res = await api.getSharingSettings();
     return (res['data'] as Map<String, dynamic>?) ?? {'fertileWindow': true, 'symptoms': false};
   } catch (_) {
-    return {'fertileWindow': true, 'symptoms': false};
+    return null;
   }
 });
