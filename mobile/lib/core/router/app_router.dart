@@ -10,6 +10,7 @@ import '../../features/home/screens/home_screen.dart';
 import '../../features/daily_log/screens/daily_log_screen.dart';
 import '../../features/history/screens/history_screen.dart';
 import '../../features/partner/screens/partner_screen.dart';
+import '../../features/pet/screens/pet_selection_screen.dart';
 
 final _rootKey = GlobalKey<NavigatorState>();
 
@@ -49,6 +50,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/log', builder: (c, s) => const DailyLogScreen()),
       GoRoute(path: '/history', builder: (c, s) => const HistoryScreen()),
       GoRoute(path: '/partner', builder: (c, s) => const PartnerScreen()),
+      GoRoute(path: '/pet-selection', builder: (c, s) => const PetSelectionScreen()),
     ],
   );
 });

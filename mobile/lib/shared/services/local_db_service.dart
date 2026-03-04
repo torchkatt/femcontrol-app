@@ -233,6 +233,14 @@ class LocalDbService {
   Future<void> clearSession() async {
     await _settings.delete(_kIsGuest);
   }
+
+  // ── Mascota ────────────────────────────────────────────────────────
+
+  Future<void> setSelectedPet(String petId) =>
+      _settings.put('selectedPet', petId);
+
+  String getSelectedPet() =>
+      (_settings.get('selectedPet') as String?) ?? 'llama';
 }
 
 // ── Provider ──────────────────────────────────────────────────────────

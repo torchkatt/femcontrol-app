@@ -134,4 +134,28 @@ class ApiService {
   Future<void> unlinkPartner() async {
     await _dio.delete('/couple/unlink');
   }
+
+  Future<Map<String, dynamic>> getPartnerCycleStatus() async {
+    final res = await _dio.get('/couple/partner/cycle');
+    return res.data;
+  }
+
+  Future<Map<String, dynamic>> createLogForPartner({
+    required String logDate,
+    int? flowLevel,
+    int? painLevel,
+    List<String>? mood,
+    List<String>? symptoms,
+    String? notes,
+  }) async {
+    final res = await _dio.post('/couple/partner/log', data: {
+      'logDate': logDate,
+      if (flowLevel != null) 'flowLevel': flowLevel,
+      if (painLevel != null) 'painLevel': painLevel,
+      if (mood != null) 'mood': mood,
+      if (symptoms != null) 'symptoms': symptoms,
+      if (notes != null) 'notes': notes,
+    });
+    return res.data;
+  }
 }

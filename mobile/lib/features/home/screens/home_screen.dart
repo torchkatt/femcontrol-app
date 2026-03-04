@@ -4,9 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../providers/home_provider.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../shared/services/local_db_service.dart';
+import '../../../shared/models/pet_config.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
-import 'dart:math' as math;
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -48,16 +48,16 @@ class HomeScreen extends ConsumerWidget {
                 child: _SyncBanner(onTap: () => context.push('/login')),
               ),
 
-            // Cycle Ring Card
+            // Cycle Hex Card
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: cycleAsync.when(
-                  loading: () => const _CycleRingCard(cycleData: null),
+                  loading: () => const _CycleHexCard(cycleData: null),
                   error: (_, __) => _NoCycleCard(onStart: () => _showStartCycleSheet(context, ref)),
                   data: (data) => data == null
                       ? _NoCycleCard(onStart: () => _showStartCycleSheet(context, ref))
-                      : _CycleRingCard(cycleData: data),
+                      : _CycleHexCard(cycleData: data),
                 ),
               ),
             ),
@@ -137,9 +137,9 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _CycleRingCard extends StatelessWidget {
+class _CycleHexCard extends ConsumerWidget {
   final Map<String, dynamic>? cycleData;
-  const _CycleRingCard({this.cycleData});
+  const _CycleHexCard({this.cycleData});
 
   Color _phaseColor(String? phase) {
     switch (phase) {
@@ -152,15 +152,32 @@ class _CycleRingCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final petId = ref.read(localDbServiceProvider).getSelectedPet();
+    final pet = petById(petId);
+
     if (cycleData == null) {
-      return Container(
-        height: 200,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [AppColors.terracotta.withOpacity(0.6), AppColors.terracottaLight.withOpacity(0.4)]),
-          borderRadius: BorderRadius.circular(24),
-        ),
-        child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+      return SizedBox(
+        height: 280,
+        child: Stack(children: [
+          ClipPath(
+            clipper: _HexClipper(),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [AppColors.terracotta.withOpacity(0.7), AppColors.terracotta],
+                ),
+              ),
+              child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+            ),
+          ),
+          Positioned(
+            bottom: 18, right: 18,
+            child: Text(pet.emoji, style: const TextStyle(fontSize: 58)),
+          ),
+        ]),
       );
     }
 
@@ -168,53 +185,59 @@ class _CycleRingCard extends StatelessWidget {
     final total = cycleData!['expectedLength'] as int? ?? 28;
     final phase = cycleData!['phase'] as String? ?? 'menstrual';
     final phaseName = AppConstants.phaseNames[phase] ?? phase;
-    final phaseDesc = AppConstants.phaseDescriptions[phase] ?? '';
     final color = _phaseColor(phase);
-    final progress = (day / total).clamp(0.0, 1.0);
+    final daysLeft = (total - day).clamp(0, total);
 
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [color.withOpacity(0.9), color],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: color.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 8))],
-      ),
-      child: Row(
+    return SizedBox(
+      height: 280,
+      child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text('Fase $phaseName',
-                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+          // Hex card
+          ClipPath(
+            clipper: _HexClipper(),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [color.withOpacity(0.82), color],
                 ),
-                const SizedBox(height: 16),
-                RichText(
-                  text: TextSpan(children: [
-                    TextSpan(text: 'Día $day', style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: -1)),
-                    TextSpan(text: ' / $total', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 18)),
-                  ]),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.22),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text('Fase $phaseName',
+                          style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
+                    ),
+                    const SizedBox(height: 14),
+                    Text('Faltan',
+                        style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 15, fontWeight: FontWeight.w400)),
+                    Text('$daysLeft días',
+                        style: const TextStyle(color: Colors.white, fontSize: 44, fontWeight: FontWeight.w900, letterSpacing: -1)),
+                    const SizedBox(height: 4),
+                    Text('Día $day de $total',
+                        style: TextStyle(color: Colors.white.withOpacity(0.75), fontSize: 13)),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(phaseDesc, style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 13, height: 1.4)),
-              ],
+              ),
             ),
           ),
-          const SizedBox(width: 20),
-          SizedBox(
-            width: 90,
-            height: 90,
-            child: CustomPaint(painter: _RingPainter(progress: progress, color: Colors.white)),
+          // Mascota flotante (fuera del clip)
+          Positioned(
+            bottom: 14,
+            right: 14,
+            child: GestureDetector(
+              onTap: () => context.push('/pet-selection'),
+              child: Text(pet.emoji, style: const TextStyle(fontSize: 62)),
+            ),
           ),
         ],
       ),
@@ -222,27 +245,23 @@ class _CycleRingCard extends StatelessWidget {
   }
 }
 
-class _RingPainter extends CustomPainter {
-  final double progress;
-  final Color color;
-  const _RingPainter({required this.progress, required this.color});
-
+class _HexClipper extends CustomClipper<Path> {
   @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromLTWH(6, 6, size.width - 12, size.height - 12);
-    final bg = Paint()..color = color.withOpacity(0.2)..style = PaintingStyle.stroke..strokeWidth = 8..strokeCap = StrokeCap.round;
-    final fg = Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 8..strokeCap = StrokeCap.round;
-    canvas.drawArc(rect, -math.pi / 2, 2 * math.pi, false, bg);
-    canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * progress, false, fg);
-    final tp = TextPainter(
-      text: TextSpan(text: '${(progress * 100).round()}%', style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.w700)),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, Offset((size.width - tp.width) / 2, (size.height - tp.height) / 2));
+  Path getClip(Size size) {
+    final w = size.width;
+    final h = size.height;
+    return Path()
+      ..moveTo(w * 0.5, 0)
+      ..lineTo(w, h * 0.22)
+      ..lineTo(w, h * 0.78)
+      ..lineTo(w * 0.5, h)
+      ..lineTo(0, h * 0.78)
+      ..lineTo(0, h * 0.22)
+      ..close();
   }
 
   @override
-  bool shouldRepaint(_RingPainter old) => old.progress != progress;
+  bool shouldReclip(_HexClipper old) => false;
 }
 
 class _NoCycleCard extends StatelessWidget {

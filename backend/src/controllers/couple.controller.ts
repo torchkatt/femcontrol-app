@@ -27,6 +27,31 @@ export const getPartnerInfo = async (req: AuthRequest, res: Response) => {
     }
 };
 
+export const getPartnerCycleStatus = async (req: AuthRequest, res: Response) => {
+    try {
+        const result = await CoupleService.getPartnerCycleStatus(req.user!.userId);
+        res.json({ success: true, data: result });
+    } catch (error: any) {
+        res.status(404).json({ success: false, message: error.message });
+    }
+};
+
+export const createLogForPartner = async (req: AuthRequest, res: Response) => {
+    try {
+        const { logDate, flowLevel, painLevel, mood, symptoms, notes } = req.body;
+        if (!logDate) {
+            res.status(400).json({ success: false, message: 'logDate es requerido' });
+            return;
+        }
+        const result = await CoupleService.createLogForPartner(
+            req.user!.userId, logDate, flowLevel, painLevel, mood, symptoms, notes,
+        );
+        res.json({ success: true, data: result });
+    } catch (error: any) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+};
+
 export const unlinkPartner = async (req: AuthRequest, res: Response) => {
     try {
         const userId = req.user!.userId;
