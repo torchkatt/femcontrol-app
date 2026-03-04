@@ -12,7 +12,8 @@ export const register = async (req: Request, res: Response) => {
         const result = await AuthService.register(email, password, name);
         res.status(201).json({ success: true, data: result });
     } catch (error: any) {
-        res.status(400).json({ success: false, message: error.message });
+        const isDuplicate = error.message?.includes('ya está registrado');
+        res.status(isDuplicate ? 409 : 400).json({ success: false, message: error.message });
     }
 };
 

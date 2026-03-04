@@ -35,6 +35,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
       return;
     }
+    if (!email.contains('@') || !email.contains('.')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ingresa un correo electrónico válido')),
+      );
+      return;
+    }
     final ok = await ref.read(authProvider.notifier).login(email, password);
     if (ok && mounted) context.go('/home');
   }
