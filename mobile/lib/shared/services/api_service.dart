@@ -10,8 +10,8 @@ class ApiService {
   final _storage = const FlutterSecureStorage();
   late final Dio _dio = Dio(BaseOptions(
     baseUrl: AppConstants.baseUrl,
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 10),
+    connectTimeout: const Duration(seconds: 90),
+    receiveTimeout: const Duration(seconds: 30),
     headers: {
       'Content-Type': 'application/json',
       'Bypass-Tunnel-Reminder': 'true',
@@ -34,6 +34,16 @@ class ApiService {
   Future<void> saveToken(String token) => _storage.write(key: 'token', value: token);
   Future<String?> getToken() => _storage.read(key: 'token');
   Future<void> deleteToken() => _storage.delete(key: 'token');
+
+  Future<void> warmup() async {
+    try {
+      await _dio.get('/health',
+          options: Options(
+            sendTimeout: const Duration(seconds: 5),
+            receiveTimeout: const Duration(seconds: 90),
+          ));
+    } catch (_) {}
+  }
 
   // Auth
   Future<Map<String, dynamic>> register(String email, String password, String name) async {

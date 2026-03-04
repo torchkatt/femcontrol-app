@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -74,6 +75,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     // 1. Intentar validar token de nube
     final token = await _api.getToken();
     if (token != null) {
+      // Despertar el servidor en paralelo con la validación del token
+      unawaited(_api.warmup());
       try {
         final profile = await _api.getProfile();
         state = state.copyWith(
@@ -102,7 +105,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return;
     }
 
-    // 3. Ni token ni invitado → mostrar pantalla de bienvenida
+    // 3. Ni token ni invitado → despertar servidor en background y mostrar login
+    unawaited(_api.warmup());
     state = state.copyWith(isInitializing: false, clearError: true);
   }
 
@@ -150,6 +154,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final googleUser = await _googleSignIn.signIn();
+
+      // En web, el resultado llega por onCurrentUserChanged.
+      // Si signIn() devuelve null, el listener se encarga cuando el OAuth complete.
+      // Si devuelve non-null, el listener ya disparó _handleGoogleAccount → evitar duplicado.
+      if (kIsWeb) {
+        if (googleUser == null) state = state.copyWith(isLoading: false);
+        return false;
+      }
+
       if (googleUser == null) {
         state = state.copyWith(isLoading: false);
         return false;
@@ -245,9 +258,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return 'Servidor no disponible. La sincronización en la nube no está activa.';
     }
     if (str.contains('DioException')) {
-      // Conexión rechazada o sin respuesta
+      if (str.contains('timed out') || str.contains('connection timeout')) {
+        return 'El servidor está iniciando, puede tardar hasta un minuto. Intenta de nuevo.';
+      }
       if (str.contains('connection') || str.contains('refused') ||
-          str.contains('timed out') || str.contains('No route to host')) {
+          str.contains('No route to host')) {
         return 'Servidor no disponible. La sincronización en la nube no está activa.';
       }
       try {
