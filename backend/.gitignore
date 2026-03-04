@@ -3,3 +3,10 @@ node_modules
 .env
 
 /src/generated/prisma
+
+# TypeScript build output (outDir = dist)
+dist/
+src/**/*.js
+src/**/*.js.map
+src/**/*.d.ts
+src/**/*.d.ts.map
